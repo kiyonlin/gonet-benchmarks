@@ -6,24 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
-	"sync"
 )
-
-var (
-	part1 = []byte("HTTP/1.1 200 Ok\r\nContent-Type: text/plain; charset=utf-8\r\nDate: ")
-	part2 = []byte("\r\nServer: net_\r\nContent-Length: 13\r\n\r\nHello, World!")
-)
-
-var readerPool = sync.Pool{
-	New: func() interface{} {
-		return bufio.NewReaderSize(nil, 4096)
-	},
-}
-var writerPool = sync.Pool{
-	New: func() interface{} {
-		return bufio.NewWriterSize(nil, 4096)
-	},
-}
 
 func runNet() {
 	fmt.Println("net running on\t\t3000")
@@ -42,43 +25,39 @@ func runNet() {
 	}
 }
 
+var (
+	part1 = []byte("HTTP/1.1 200 Ok\r\nContent-Type: text/plain; charset=utf-8\r\nDate: ")
+	part2 = []byte("\r\nServer: net_\r\nContent-Length: 13\r\n\r\nHello, World!")
+)
+
 func serveConn(c net.Conn) {
-	br := acquireReader(c)
 	var (
-		bw  *bufio.Writer
+		br  = bufio.NewReaderSize(c, 1024)
+		bw  = bufio.NewWriterSize(c, 1024)
 		err error
 		buf []byte
+		n   int
 	)
 	for {
-		buf, err = br.Peek(4)
-		if len(buf) == 0 {
-			if err == io.EOF {
-				continue
+		if n > 0 {
+			_, err = br.Discard(n)
+		} else {
+			for {
+				buf, _, err = br.ReadLine()
+				if err != nil {
+					break
+				}
+				n += len(buf) + 2
+				// blank line -> len(buf) is 0
+				if len(buf) == 0 {
+					break
+				}
+				// request not ready, yet
 			}
-			break
-		}
-
-		for {
-			buf, _, err = br.ReadLine()
-			if err != nil {
-				break
-			}
-			// blank line -> len(buf) is 0
-			if len(buf) == 0 {
-				// Discard all read data
-				_, err = br.Discard(br.Buffered())
-				break
-			}
-			// request not ready, yet
 		}
 
 		if err != nil && err != io.EOF {
-			log.Println("read error", err)
 			break
-		}
-
-		if bw == nil {
-			bw = acquireWriter(c)
 		}
 
 		out := append(part1, ServerDate.Load().([]byte)...)
@@ -86,7 +65,6 @@ func serveConn(c net.Conn) {
 
 		_, err = bw.Write(out)
 		if err != nil {
-			log.Println("write error", err)
 			break
 		}
 
@@ -97,31 +75,5 @@ func serveConn(c net.Conn) {
 		}
 	}
 
-	releaseReader(br)
-
-	if bw != nil {
-		releaseWriter(bw)
-	}
-
 	c.Close()
-}
-
-func acquireReader(c net.Conn) *bufio.Reader {
-	r := readerPool.Get().(*bufio.Reader)
-	r.Reset(c)
-	return r
-}
-
-func releaseReader(r *bufio.Reader) {
-	readerPool.Put(r)
-}
-
-func acquireWriter(c net.Conn) *bufio.Writer {
-	w := writerPool.Get().(*bufio.Writer)
-	w.Reset(c)
-	return w
-}
-
-func releaseWriter(w *bufio.Writer) {
-	writerPool.Put(w)
 }
