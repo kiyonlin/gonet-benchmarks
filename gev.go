@@ -17,7 +17,7 @@ func (s *gevServer) OnConnect(c *connection.Connection) {
 func (s *gevServer) OnMessage(c *connection.Connection, ctx interface{}, data []byte) (out []byte) {
 	out = append(out, "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nDate: "...)
 	out = append(out, ServerDate.Load().([]byte)...)
-	out = append(out, "\r\nServer: gev\r\nContent-Length: 13\r\n\r\nHello, World!"...)
+	out = append(out, "\r\nServer: gev_\r\nContent-Length: 13\r\n\r\nHello, World!"...)
 	return
 }
 

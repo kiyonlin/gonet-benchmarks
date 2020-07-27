@@ -2,12 +2,16 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"sync"
+)
+
+var (
+	part1 = []byte("HTTP/1.1 200 Ok\r\nContent-Type: text/plain; charset=utf-8\r\nDate: ")
+	part2 = []byte("\r\nServer: net_\r\nContent-Length: 13\r\n\r\nHello, World!")
 )
 
 var readerPool = sync.Pool{
@@ -54,18 +58,18 @@ func serveConn(c net.Conn) {
 			break
 		}
 
-		n := 1
 		for {
-			buf, err = br.Peek(n)
+			buf, _, err = br.ReadLine()
 			if err != nil {
 				break
 			}
-			if i := bytes.Index(buf, delimiter); i != -1 {
+			// blank line -> len(buf) is 0
+			if len(buf) == 0 {
+				// Discard all read data
 				_, err = br.Discard(br.Buffered())
 				break
 			}
 			// request not ready, yet
-			n += 1
 		}
 
 		if err != nil && err != io.EOF {
@@ -77,8 +81,8 @@ func serveConn(c net.Conn) {
 			bw = acquireWriter(c)
 		}
 
-		out := append([]byte("HTTP/1.1 200 Ok\r\nContent-Type: text/plain; charset=utf-8\r\nDate: "), ServerDate.Load().([]byte)...)
-		out = append(out, []byte("\r\nServer: net\r\nContent-Length: 13\r\n\r\nHello, World!")...)
+		out := append(part1, ServerDate.Load().([]byte)...)
+		out = append(out, part2...)
 
 		_, err = bw.Write(out)
 		if err != nil {
