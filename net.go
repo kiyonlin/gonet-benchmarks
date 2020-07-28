@@ -41,10 +41,13 @@ func serveConn(c net.Conn) {
 	for {
 		if n > 0 {
 			_, err = br.Discard(n)
+			if err == io.EOF {
+				continue
+			}
 		} else {
 			for {
 				buf, _, err = br.ReadLine()
-				if err != nil {
+				if err != nil && err != io.EOF {
 					break
 				}
 				n += len(buf) + 2
@@ -56,7 +59,7 @@ func serveConn(c net.Conn) {
 			}
 		}
 
-		if err != nil && err != io.EOF {
+		if err != nil {
 			break
 		}
 
